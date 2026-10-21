@@ -1,7 +1,7 @@
 #include "../include/interpreter.h"
-#include <stdio.h>
 
 static void cancel_int(int sig) { (void) sig; }
+static void flush_stdin(void) { int c; while ((c = getchar()) != '\n' && c != EOF);}
 
 int interpreter(unsigned char *stack, int stack_size)
 {
@@ -9,8 +9,8 @@ int interpreter(unsigned char *stack, int stack_size)
     char buff[BUFF_SIZE];
     ssize_t bytes_read = 0;
 
-    printf("BrainFuck Interpretor V0.0.1 Stack size:%d\n(Press CTRL+D to quit, CTRL+C won't work)\n> ", stack_size);
-    fflush(0);
+    printf("BrainFuck Interpretor V0.1 Stack size:%d\n(Press CTRL+D to quit, CTRL+C won't work)\n> ", stack_size);
+    flush_stdin();
     bytes_read = read(0, buff, BUFF_SIZE);
     while (bytes_read > 0) {
         for (int i = 0; i < bytes_read - 1; i++) {
@@ -30,9 +30,11 @@ int interpreter(unsigned char *stack, int stack_size)
                         p--;
                     break;
                 case '.':
-                    printf("%c", stack[p]);
+                    dprintf(1, "%c", stack[p]);
                     break;
                 case ',':
+                    read(0, &stack[p], 1);
+                    flush_stdin();
                     break;
                 case '[':
                     //TODO: IMPLEMENT IT
@@ -40,10 +42,11 @@ int interpreter(unsigned char *stack, int stack_size)
                 case ']':
                     //TODO: IMPLEMENT IT
                     break;
+                default:
+                    break;
             }
         }
-        printf("\n> ");
-        fflush(0);
+        dprintf(1, "\n> ");
         bytes_read = read(0, buff, BUFF_SIZE);
     }
     return 0;
