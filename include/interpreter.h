@@ -8,6 +8,7 @@
     #include <unistd.h>
     #include <string.h>
     #include <signal.h>
+    #include <errno.h>
 
     #define BUFF_SIZE 4096
 

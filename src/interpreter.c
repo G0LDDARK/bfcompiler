@@ -1,43 +1,32 @@
 #include "../include/interpreter.h"
 
 static void cancel_int(int sig) { (void) sig; }
-static void flush_stdin(void) { int c; while ((c = getchar()) != '\n' && c != EOF); }
+static void flush_stdin(void) { char c = 0; while (read(0, &c, 1) > 0 && c != '\n'); }
 
-size_t *parse_bracket_map(char *buff, int buff_size)
+int parse_bracket_map(const char *buff, int buff_size, size_t *bracket_map, size_t *bracket_stack)
 {
-    size_t *bracket_map = malloc(buff_size * sizeof(size_t));
-    if (!bracket_map) return NULL;
-
-    size_t *bracket_stack = malloc(buff_size * sizeof(size_t));
-    if (!bracket_stack) { free(bracket_map); return NULL; }
-
     int stack_position = 0;
 
     for (int i = 0; i < buff_size; i++) {
         if (buff[i] == '[') {
-            bracket_stack[stack_position] = i;
+            bracket_stack[stack_position] = (size_t)i;
             stack_position++;
         } else if (buff[i] == ']') {
             if (stack_position == 0) {
-                dprintf(2, "[ERROR]: Unbalanced brackets (unexpected ']')\n");
-                free(bracket_map);
-                free(bracket_stack);
-                return NULL;
+                dprintf(2, "[Syntax]: Unbalanced brackets (unexpected ']')\n");
+                return -1;
             }
             stack_position--;
             size_t open_i = bracket_stack[stack_position];
             bracket_map[i] = open_i;
-            bracket_map[open_i] = i;
+            bracket_map[open_i] = (size_t)i;
         }
     }
     if (stack_position != 0) {
-        dprintf(2, "[ERROR]: Unbalanced brackets (missing ']')\n");
-        free(bracket_map);
-        free(bracket_stack);
-        return NULL;
+        dprintf(2, "[Syntax]: Unbalanced brackets (missing ']')\n");
+        return -1;
     }
-    free(bracket_stack);
-    return bracket_map;
+    return 0;
 }
 
 int interpreter(unsigned char *stack, int stack_size)
@@ -45,16 +34,40 @@ int interpreter(unsigned char *stack, int stack_size)
     int p = 0;
     char buff[BUFF_SIZE];
     ssize_t bytes_read = 0;
-    size_t *bracket_map;
+    size_t *mem = malloc(BUFF_SIZE * 2 * sizeof(size_t));
+    if (!mem) return 1;
 
-    dprintf(1, "BrainFuck Interpretor V0.1 Stack of size: %d\n(Press CTRL+D to quit, CTRL+C won't work)\n> ", stack_size);
-    bytes_read = read(0, buff, BUFF_SIZE);
-    while (bytes_read > 0) {
-        if ((bracket_map = parse_bracket_map(buff, bytes_read)) == NULL) {
-            dprintf(2, "[ERROR]: Parsing failed, restart the interpreter\n");
-            return 1;
+    size_t *bracket_map = mem;
+    size_t *bracket_stack = mem + BUFF_SIZE;
+
+    dprintf(1, "BrainFuck Interpreter V0.2 Stack size: %d\n(Type 'exit' or 'quit' to leave, CTRL+D to exit, CTRL+C cancels input)\n> ", stack_size);
+
+    while (1) {
+        bytes_read = read(0, buff, BUFF_SIZE - 1);
+        if (bytes_read < 0) {
+            if (errno == EINTR) {
+                dprintf(1, "\n> ");
+                continue;
+            }
+            break;
         }
-        for (int i = 0; i < bytes_read - 1;) {
+        if (bytes_read == 0)
+            break;
+        buff[bytes_read] = '\0';
+        while (bytes_read > 0 && (buff[bytes_read - 1] == '\n' || buff[bytes_read - 1] == '\r')) {
+            buff[--bytes_read] = '\0';
+        }
+        if (bytes_read == 0) {
+            dprintf(1, "> ");
+            continue;
+        }
+        if (strcmp(buff, "exit") == 0 || strcmp(buff, "quit") == 0)
+            break;
+        if (parse_bracket_map(buff, bytes_read, bracket_map, bracket_stack) != 0) {
+            dprintf(1, "> ");
+            continue;
+        }
+        for (int i = 0; i < bytes_read;) {
             switch (buff[i]) {
                 case '+':
                     stack[p] += 1;
@@ -78,7 +91,7 @@ int interpreter(unsigned char *stack, int stack_size)
                     dprintf(1, "%c", stack[p]);
                     i++;
                     break;
-                case ',':
+                case ',': {
                     ssize_t in_read = read(0, &stack[p], 1);
                     if (in_read <= 0)
                         stack[p] = 0;
@@ -86,36 +99,38 @@ int interpreter(unsigned char *stack, int stack_size)
                         flush_stdin();
                     i++;
                     break;
+                }
                 case '[':
-                    if (stack[p] == 0)
-                        i = bracket_map[i] + 1;
+                    if (i + 2 < bytes_read && (buff[i + 1] == '-' || buff[i + 1] == '+') && buff[i + 2] == ']') {
+                        stack[p] = 0;
+                        i += 3;
+                    } else if (stack[p] == 0)
+                        i = (int)bracket_map[i] + 1;
                     else
                         i++;
                     break;
                 case ']':
                     if (stack[p] != 0)
-                        i = bracket_map[i] + 1;
+                        i = (int)bracket_map[i] + 1;
                     else
                         i++;
                     break;
+
                 default:
                     i++;
                     break;
             }
         }
-        if (bracket_map)
-            free(bracket_map);
         dprintf(1, "\n> ");
-        bytes_read = read(0, buff, BUFF_SIZE);
     }
+    free(mem);
     return 0;
 }
 
 unsigned char *init_stack(int size)
 {
-    unsigned char *stack;
+    unsigned char *stack = calloc(size, sizeof(unsigned char));
 
-    stack = calloc(size, sizeof(unsigned char));
     if (!stack)
         return NULL;
     return stack;
@@ -125,23 +140,24 @@ int main(int ac, char **av)
 {
     int status = 0;
     int stack_size = 0;
-    unsigned char *stack;
+    unsigned char *stack = NULL;
 
     signal(SIGINT, cancel_int);
     if (ac > 1) {
         if (strcmp(av[1], "-h") == 0) {
-            dprintf(1, "Usage:\n  -h:\t\tprint this page\n  <number>:\tsize of the stack (if not privided, default value is 30 000)\n");
+            dprintf(1, "Usage:\n  -h:\t\tprint this page\n  <number>:\tsize of the stack (default: %d)\n", STACK_SIZE);
             return 0;
-        } else {
-            stack_size = atoi(av[1]);
         }
+        stack_size = atoi(av[1]);
     }
     if (stack_size <= 0)
         stack_size = STACK_SIZE;
-    if (!(stack = init_stack(stack_size)))
+    stack = init_stack(stack_size);
+    if (!stack) {
+        dprintf(2, "[Fatal]: Failed to allocate stack memory\n");
         return 1;
+    }
     status = interpreter(stack, stack_size);
-    if (stack)
-        free(stack);
+    free(stack);
     return status;
 }
