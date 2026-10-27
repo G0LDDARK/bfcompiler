@@ -29,6 +29,61 @@ int parse_bracket_map(const char *buff, int buff_size, size_t *bracket_map, size
     return 0;
 }
 
+void visualize(unsigned char *stack, int p, int stack_size)
+{
+    int start = (p > 4) ? (p - 4) : 0;
+    int end = (p + 4 < stack_size) ? (p + 4) : (stack_size - 1);
+
+    dprintf(1, "--------");
+    for (int i = start; i <= end; i++)
+        dprintf(1, "--------");
+    dprintf(1, "-\n");
+    dprintf(1, "| Index ");
+    for (int i = start; i <= end; i++)
+        dprintf(1, "| %5d ", i);
+    dprintf(1, "|\n");
+    dprintf(1, "--------");
+    for (int i = start; i <= end; i++)
+        dprintf(1, "--------");
+    dprintf(1, "-\n");
+    dprintf(1, "| Value ");
+    for (int i = start; i <= end; i++)
+        dprintf(1, "| %5u ", (unsigned int)stack[i]);
+    dprintf(1, "|\n");
+    dprintf(1, "| ASCII ");
+    for (int i = start; i <= end; i++) {
+        unsigned char c = stack[i];
+        if (c >= 32 && c <= 126)
+            dprintf(1, "| %4c  ", c);
+        else
+            dprintf(1, "|   .   ");
+    }
+    dprintf(1, "|\n");
+    dprintf(1, "--------");
+    for (int i = start; i <= end; i++)
+        dprintf(1, "--------");
+    dprintf(1, "-\n");
+    dprintf(1, "        ");
+    for (int i = start; i <= end; i++) {
+        if (i == p)
+            dprintf(1, "    ^   ");
+        else
+            dprintf(1, "        ");
+    }
+    dprintf(1, "\n");
+}
+
+int check_builtin(char *buff, unsigned char *stack, int p, int stack_size)
+{
+    if (strcmp(buff, "exit") == 0 || strcmp(buff, "quit") == 0)
+        return 1;
+    if(strcmp(buff, "visualize") == 0) {
+        visualize(stack, p, stack_size);
+        return 2;
+    }
+    return 0;
+}
+
 int interpreter(unsigned char *stack, int stack_size)
 {
     int p = 0;
@@ -61,8 +116,13 @@ int interpreter(unsigned char *stack, int stack_size)
             dprintf(1, "> ");
             continue;
         }
-        if (strcmp(buff, "exit") == 0 || strcmp(buff, "quit") == 0)
+        int builtin_res = check_builtin(buff, stack, p, stack_size);
+        if (builtin_res == 1)
             break;
+        if (builtin_res == 2) {
+            dprintf(1, "\n> ");
+            continue;
+        }
         if (parse_bracket_map(buff, bytes_read, bracket_map, bracket_stack) != 0) {
             dprintf(1, "> ");
             continue;
