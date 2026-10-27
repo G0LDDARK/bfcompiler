@@ -40,7 +40,7 @@ int interpreter(unsigned char *stack, int stack_size)
     size_t *bracket_map = mem;
     size_t *bracket_stack = mem + BUFF_SIZE;
 
-    dprintf(1, "BrainFuck Interpreter V0.2 Stack size: %d\n(Type 'exit' or 'quit' to leave, CTRL+D to exit, CTRL+C cancels input)\n> ", stack_size);
+    dprintf(1, "BrainFuck Interpreter V1.0 Stack size: %d\n(Type 'exit' or 'quit' to leave, CTRL+D to exit, CTRL+C cancels input)\n> ", stack_size);
 
     while (1) {
         bytes_read = read(0, buff, BUFF_SIZE - 1);
