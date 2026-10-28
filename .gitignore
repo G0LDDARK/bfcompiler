@@ -36,6 +36,7 @@
 *.x86_64
 *.hex
 bf_interpreter
+bf_compiler
 
 # Debug files
 *.dSYM/
