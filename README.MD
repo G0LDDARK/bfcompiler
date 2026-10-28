@@ -1,17 +1,17 @@
+# BF-Suite
+
 <div align="center">
     <img src="screenshots/ADD_README.png"/>
 </div>
 
----
+## BF Interpreter
 
-# BF Interpreter
-
-## Build
+### Build
 ```plaintext
 make
 ```
 
-## Usage
+### Usage
 Help menu
 ```plaintext
 ./bf_interpreter -h
@@ -41,3 +41,6 @@ The visualize command to see the current state of the stack and the pointer
 -------------------------------------------------
             ^
 ```
+
+## BF Compiler
+### Comming soon
